@@ -95,27 +95,18 @@ input:-internal-autofill-selected {background-color: #fff !important;}
 </div>
 
 <?php
-// MS15052026 - Change Start
-session_start();
-if(isset($_SESSION['email'])){
-    if($_SESSION['role']==9){
-        header('Location: judgment_layout');  
-    } else {
-        if(isset($_SESSION['settlement_number'])){
-            header('Location: Settlement_Form/settlement-request');
-        } else {
-            header('Location: inventory_layout');
-        }
-    }
-    exit();
-}
-// MS15052026 - Change End
 
 header("X-XSS-Protection: 1; mode=block");
 // ini_set('header always set x-frame-options',"DENY");
 error_reporting(1);
 include_once "config.php";
 require_once 'device_fingerprint.php'; // MS15052026 - ADDED DEVICE FINGERPRINTING FUNCTIONS
+session_start();
+// if(isset($_SESSION['email']))
+// {
+//   header('Location: inventory_layout');
+//   exit();
+//   }
 
 // MS15052026 - ADDED FUNCTION TO GET BROWSER NAME
 function getBrowserName($userAgent) {
@@ -127,7 +118,6 @@ function getBrowserName($userAgent) {
     if(stripos($userAgent, 'MSIE') !== false || stripos($userAgent, 'Trident') !== false) return 'Internet Explorer';
     return 'Unknown Browser';
 }
-
 // MS15052026 - END GET BROWSER NAME
 
 for ($i = 1; $i <= 36; $i++) 
