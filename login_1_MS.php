@@ -1,4 +1,4 @@
-/** 
+<!--
 * CHANGELOG:
 *----------------------------------------------------------------------------
 * Version | Date       | Author              | Description
@@ -9,7 +9,7 @@
 *         |            |                     | devices also verify and manage 
 *         |            |                     | those devices through tbl_login   
 *-----------------------------------------------------------------------------
-*/
+-->
 <!DOCTYPE html>
 <!---- for browser version check----------------------------->
 <script>
