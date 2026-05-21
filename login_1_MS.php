@@ -4,9 +4,10 @@
 * Version | Date       | Author              | Description
 * ----------------------------------------------------------------------------
 * ----------------------------------------------------------------------------
-* 1.1     | 2026-05-15 | MS15052026          |             
-*         |            |                     |                     
-*         |            |                     |    
+* 1.1     | 2026-05-15 | MS15052026          | Added Device Verification logic            
+*         |            |                     | To detect known and new login                    
+*         |            |                     | devices also verify and manage 
+*         |            |                     | those devices through tbl_login   
 *-----------------------------------------------------------------------------
 */
 <!DOCTYPE html>
@@ -31,8 +32,8 @@ if(browserVersion > 0 && browserVersion < 9){
 <head>
   <meta charset="utf-8">
   <meta http-equiv="X-UA-Compatible" content="IE=edge">
-  <title>AACANet | Sign In</title>
-<meta name="viewport" content="width=1024">
+  <title>GPS | Sign In</title>
+  <meta content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" name="viewport">
   <meta http-equiv="X-UA-Compatible" content="IE=11"/>
   <meta http-equiv="X-UA-Compatible" content="IE=10"/>
   <meta http-equiv="X-UA-Compatible" content="IE=9"/>
@@ -94,6 +95,7 @@ input:-internal-autofill-selected {background-color: #fff !important;}
 </div>
 
 <?php
+// MS15052026 - Change Start
 session_start();
 if(isset($_SESSION['email'])){
     if($_SESSION['role']==9){
@@ -107,6 +109,7 @@ if(isset($_SESSION['email'])){
     }
     exit();
 }
+// MS15052026 - Change End
 
 header("X-XSS-Protection: 1; mode=block");
 // ini_set('header always set x-frame-options',"DENY");
@@ -127,7 +130,6 @@ function getBrowserName($userAgent) {
 
 // MS15052026 - END GET BROWSER NAME
 
-
 for ($i = 1; $i <= 36; $i++) 
   {
     $months[] = date("Y-m", strtotime( date( 'Y-m-01' )." -$i months"));
@@ -143,7 +145,7 @@ unset($_SESSION['count']);
 $msg="";$Emailmsg=''; $passwordmsg='';
 if(isset($_POST['but_submit'])){
     $agent               =$_SERVER['HTTP_USER_AGENT'];
-    $browserName         = getBrowserName($agent);
+    $browserName         = getBrowserName($agent);        // MS15052026 - Added to get exact browser name.
     $ipAddress           =$_SERVER['REMOTE_ADDR']; 
     $host_name           =gethostname();
     $email               =trim($_POST['txt_uname']);
@@ -159,6 +161,7 @@ if(isset($_POST['but_submit'])){
     $passwordmsg="Password id can not be left blank";
   }
     if ($postemail != "" && $password != ""){
+        // MS15052026 - Commented Below query and added new to read Fingerprint from DB.
         //$sql_query = "select count(*) as cntUser,UserGroup,id,fullName,vchPassword,email,LastName,companyId,userType,state,portfolioCode,role,productCode,firmCode,clientCode,loginStatus,createdAt,Check_multiple_status,Passexpdate,IPaddress,AuthorisedFlag,active_inactive_status,bit_deleted_flag from tbl_login where email='".$postemail."' and bit_deleted_flag=0 and  vchPassword !='' and company_status!=4 group by id,fullName,vchPassword,email,LastName,companyId,userType,state,portfolioCode,role,productCode,firmCode,clientCode,loginStatus,createdAt,Check_multiple_status,Passexpdate,IPaddress,AuthorisedFlag,active_inactive_status,bit_deleted_flag";//echo $sql_query;exit;
         $sql_query = "select count(*) as cntUser,UserGroup,id,fullName,vchPassword,email,LastName,companyId,userType,state,portfolioCode,role,productCode,firmCode,clientCode,loginStatus,createdAt,Check_multiple_status,Passexpdate,IPaddress,AuthorisedFlag,active_inactive_status,bit_deleted_flag,FPrint from tbl_login where email='".$postemail."' and bit_deleted_flag=0 and  vchPassword !='' and company_status!=4 group by id,fullName,vchPassword,email,LastName,companyId,userType,state,portfolioCode,role,productCode,firmCode,clientCode,loginStatus,createdAt,Check_multiple_status,Passexpdate,IPaddress,AuthorisedFlag,active_inactive_status,bit_deleted_flag";//echo $sql_query;exit;
 
@@ -183,6 +186,7 @@ if(isset($_POST['but_submit'])){
             $id             =$row['id'];
             $dateex         = DateTime::createFromFormat('m-d-Y', $row['Passexpdate']);
             $Passexpdate     =strtotime($dateex->format('Y-m-d'));
+            //$IPaddress      =explode(',',$row['IPaddress']); // MS15052026
             $IPaddress = !empty($row['FPrint']) ? explode(',', $row['FPrint']) : []; //MS15052026 - CHANGED TO EXPLODE FPrint FIELD INTO ARRAY OF DEVICES (IP/UA/TOKEN/FP)
             $countIPaddress =count($IPaddress);//echo $countmacaddress;exit;
             $AuthorisedFlag =$row['AuthorisedFlag'];
@@ -215,8 +219,7 @@ if(isset($_POST['but_submit'])){
           // }
 else
 {
-// ===== DEVICE CHECK (FINAL CLEAN VERSION) =====
-
+// MS15052026 - Start Modification
 // ===== DEVICE CHECK =====
  
 $deviceVerified = false;
@@ -246,7 +249,7 @@ if (!empty($row['FPrint'])) {
         $storedToken = trim($parts[3] ?? '');
         $storedFP    = trim($parts[4] ?? '');
  
-        // ── Match 1: fingerprint (works even after cookie cleared) ──
+        //  Match 1: fingerprint (works even after cookie cleared) 
         $postedFP = trim($_POST['device_fingerprint'] ?? '');
         if ($postedFP !== '' && $storedFP !== '' && hash_equals($storedFP, $postedFP)) {
             $deviceVerified = true;
@@ -257,13 +260,13 @@ if (!empty($row['FPrint'])) {
             break;
         }
  
-        // ── Match 2: cookie token ────────────────────────────────────
+        //  Match 2: cookie token 
         if (!empty($cookieToken) && $storedToken !== '' && hash_equals($storedToken, $cookieToken)) {
             $deviceVerified = true;
             break;
         }
  
-        // ── Match 3: IP + UA fallback (for entries with no FP yet) ──
+        //  Match 3: IP + UA fallback (for entries with no FP yet) 
         $storedIP = trim($parts[0] ?? '');
         $storedUA = trim($parts[2] ?? '');
         if (empty($cookieToken) && $storedFP === ''
@@ -274,7 +277,7 @@ if (!empty($row['FPrint'])) {
     }
 }
  
-// ❌ NOT VERIFIED → send to OTP page
+//  NOT VERIFIED - send to OTP page
 if (!$deviceVerified) {
  
     //$otp = rand(100000, 999999);
@@ -304,9 +307,7 @@ if (!$deviceVerified) {
 }
  
 // ===== DEVICE CHECK END =====
-
-
-    // ===== ORIGINAL SESSION (UNCHANGED - KEEP FULL) =====
+// MS15052026 - END Modification
     $_SESSION['email']        = $email;
     $_SESSION['userType']     = $userType;
     $_SESSION['state']        = $state;
@@ -324,9 +325,9 @@ if (!$deviceVerified) {
     $_SESSION['UserGroup']    = $row['UserGroup'];
     $_SESSION['phoneNo']      = $row['phoneNo'];
     $_SESSION['timeout']      = time();
-
     $_SESSION['firmCodenew']     = $firmCode;
     $_SESSION['clientCodenew']   = $clientCode;
+
 
     $_SESSION['AACA_RCVD_BATCH_FROM'] = $DATE1;
     $_SESSION['AACA_RCVD_BATCH_END'] = $DATE2;
@@ -340,94 +341,87 @@ if (!$deviceVerified) {
     $_SESSION['AACA_RCVD_BATCH_END_TIMELINE'] = $DATE2;
 
 
-    // ===== ORIGINAL LOGIC CONTINUES =====
     $eulaQue="Select * from MANAGE_EULA where UserId=".$id."";
     $eularesult = mysqli_query($conn,$eulaQue);
     $roweula = mysqli_fetch_array($eularesult);
     $eulaStatus= $roweula['EulaStatus'];
-
     $euladaydate=strtotime(date('Y-m-d',strtotime($roweula['EulaDate'])));
     $currentDate=strtotime(date('Y-m-d'));
     $logindatediff=($currentDate - $euladaydate)/60/60/24;
 
-    $eulayeardate =strtotime(date('Y-m-d',strtotime($roweula['createdAt'])));
+    $eulayeardate     =strtotime(date('Y-m-d',strtotime($roweula['createdAt'])));
     $logindateyeardiff=($currentDate - $eulayeardate)/60/60/24;
+    $passexpday       =($currentDate - $Passexpdate)/60/60/24;
 
-    $passexpday =($currentDate - $Passexpdate)/60/60/24;
-
-    $countQuery="SELECT count(1) as Check_multiple_status  
-                 from tbl_login 
-                 where bit_deleted_flag=0 
-                 and email='".$postemail."'";
-
-    $rescountQuery=mysqli_query($conn,$countQuery);
+    $countQuery="SELECT count(1) as Check_multiple_status  from tbl_login where  bit_deleted_flag=0 and email='".$postemail."'";//echo $countQuery;exit;
+    $rescountQuery=mysqli_query($conn,$countQuery); 
     $fetchrescountQuery=mysqli_fetch_assoc($rescountQuery);
 
+// if($row['bit_deleted_flag']!=$active_inactive_status){
+//   $passwordmsg="Please authorise yourself";
+//   }  
 
-    // ===== CONDITIONS =====
-    if($fetchrescountQuery['Check_multiple_status']>=1 && $active_inactive_status==1){
-        $passwordmsg="Please authorise yourself";
-    }  
-
-    else if($passexpday>=90 && $fetchrescountQuery['Check_multiple_status']>=1){
-        header('Location: Passexp');
-        exit();
-    }
-
-    else if($logindateyeardiff >= 366 && $fetchrescountQuery['Check_multiple_status']>=1){
+    
+  if($fetchrescountQuery['Check_multiple_status']>=1 && $active_inactive_status==1){
+$passwordmsg="Please authorise yourself";
+}  
+else if($passexpday>=90 && $fetchrescountQuery['Check_multiple_status']>=1){
+   header('Location: Passexp');
+}else if($logindateyeardiff >= 366 && $fetchrescountQuery['Check_multiple_status']>=1){
         header('Location: EULA?val=1');
-        exit();
-    }
+ }
 
-    else if($count > 0 && $eulaStatus==1 && $logindatediff <90 && $fetchrescountQuery['Check_multiple_status']>=1){
 
-        $date=date('Y-m-d H:i:s');
+else if($count > 0 && $eulaStatus==1 && $logindatediff <90   && $fetchrescountQuery['Check_multiple_status']>=1){//$loginStatus==1 && 
+   $date=date('Y-m-d H:i:s');
+   $eulaloginDetails = "UPDATE MANAGE_EULA SET EulaDate='". $date."' WHERE UserId=".$id."" ;
+   $eulaupdate = mysqli_query($conn,$eulaloginDetails);
+  $qryloginDetails = "INSERT INTO logged_in_logs(`userName`,`emailId`,`ipAddress`,`browserDetails`,`LoggedinWith`) VALUES ('$fullName ','$email','$ipAddress','$agent','$host_name')";
+$insert = mysqli_query($conn,$qryloginDetails);
+//header('Location: inventory_layout.php');
 
-        $eulaloginDetails = "UPDATE MANAGE_EULA 
-                             SET EulaDate='". $date."' 
-                             WHERE UserId=".$id;
-        mysqli_query($conn,$eulaloginDetails);
+  /*to show path based on usertype and role*/
+if($fetchrescountQuery['Check_multiple_status']>1){
+     $_SESSION['email']        = $email;
+     header('Location: loginnew');
+  }
+else if($_SESSION['role']==9){
+  header('Location: judgment_layout');  
+}else {
+  if(isset($_SESSION['settlement_number']))
+{
+  header('Location: Settlement_Form/settlement-request');
+}else if(isset($_SESSION['urlloc']))
+{
+  header('Location: mydownload');
+}
+else
+{
+   header('Location: inventory_layout');
+ }
+}
 
-        $qryloginDetails = "INSERT INTO logged_in_logs
-        (`userName`,`emailId`,`ipAddress`,`browserDetails`,`LoggedinWith`) 
-        VALUES ('$fullName','$email','$ipAddress','$agent','$host_name')";
-        mysqli_query($conn,$qryloginDetails);
+/*to show path based on usertype and role*/
 
-        // ===== REDIRECTION =====
-        if($fetchrescountQuery['Check_multiple_status']>1){
-            header('Location: loginnew');
-        }
-        else if($_SESSION['role']==9){
-            header('Location: judgment_layout');  
-        }
-        else {
-            if(isset($_SESSION['settlement_number'])){
-                header('Location: Settlement_Form/settlement-request');
-            }
-            else if(isset($_SESSION['urlloc'])){
-                header('Location: mydownload');
-            }
-            else{
-                header('Location: inventory_layout');
-            }
-        }
-        exit();
-    }
+}
 
-    else if($count > 0 && $eulaStatus==0 && $fetchrescountQuery['Check_multiple_status']>=1){
-        header('Location: EULA');
-        exit();
-    }
+else if($count > 0 && $eulaStatus==0  && $fetchrescountQuery['Check_multiple_status']>=1){//$loginStatus==1 && 
+  header('Location: EULA');
+}
+else if($count > 0 && $eulaStatus==1 &&  $logindatediff >=90  && $fetchrescountQuery['Check_multiple_status']>=1){//$loginStatus==1 && 
+  header('Location: EULA');
+}
+// else if($loginStatus==0 && $count>0  && $row['Check_multiple_status']==0){ 
+//   $_SESSION['email'] = $email;
 
-    else if($count > 0 && $eulaStatus==1 && $logindatediff >=90 && $fetchrescountQuery['Check_multiple_status']>=1){
-        header('Location: EULA');
-        exit();
-    }
+// header('Location: changepassword');
+// }
+
 
     else { 
         $msg="Invalid userid or password";
     }
-}  
+}   
 
     }
 
@@ -455,7 +449,7 @@ if (!$deviceVerified) {
     
     <div class="col-sm-12">
         <form action="" id="loginForm" method="post" autocomplete="off">
-          <input type="hidden" id="device_fingerprint" name="device_fingerprint" value="">
+          <input type="hidden" id="device_fingerprint" name="device_fingerprint" value=""> <!-- MS15052026 -->
            <span style="color:red"><?php echo $unauthuser;?></span>
          <span style="color:red"><?php echo $unauthusermore;?></span>
         <div class="form-group clearfix">
@@ -504,8 +498,7 @@ if (!$deviceVerified) {
     
 <!--    <div id="formFooter">
       <a class="underlineHover fadeIn fourth" href="register.html#">Register here</a>
-    </div> -->
-    
+    </div> -->    
   <section>
 	  <div class="col-sm-8 p0"></div>
 	  <div class="col-sm-4 p0" style="position: relative;bottom: 65px;">
@@ -568,7 +561,7 @@ if(auth!=''){
    }
  });
 }
-// MS15052026 - START ADDED DEVICE FINGERPRINTING INITIALIZATION
+// MS15052026 - START ADDED DEVICE FINGERPRINTING INITIALIZATION 
 </script> 
 <script src="js/DeviceFingerprint.js"></script>
      <script>
@@ -576,7 +569,7 @@ if(auth!=''){
            DeviceFingerprint.init('device_fingerprint');
        });
      </script>    
-
+<!-- MS15052026 - END ADDED DEVICE FINGERPRINTING INITIALIZATION -->
 <?php
 /* Start:Change log sweet alert  by puja kuamri on dt-061021 */
  if(isset($_SESSION['forgototp']))
@@ -624,18 +617,18 @@ if(auth!=''){
  unset($_SESSION['changepass']);
  /*End: Change log sweet alert  by puja kuamri on dt-061021*/
 
-// if($_SESSION['role']==9){
-//   header('Location: judgment_layout');  
-// }else {
-//   if(isset($_SESSION['settlement_number']))
-// {
-//   header('Location: Settlement_Form/settlement-request');
-// }
-// else
-// {
-//    header('Location: inventory_layout');
-//  }
-// }
+if($_SESSION['role']==9){
+  header('Location: judgment_layout');  
+}else {
+if(isset($_SESSION['settlement_number']))
+{
+header('Location: Settlement_Form/settlement-request');
+}
+else
+{
+  header('Location: inventory_layout');
+ }
+}
 
 
 //$_SESSION["login_time_stamp"] = time(); 
