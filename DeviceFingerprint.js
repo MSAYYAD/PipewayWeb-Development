@@ -1,13 +1,24 @@
 /**
  * DeviceFingerprint.js
- * ─────────────────────────────────────────────
- * Drop-in browser fingerprint library.
- * Produces the same SHA-256 hash every time on
- * the same browser/machine — survives close,
- * restart, and cookie deletion.
+ * -------------------------------------------------------------------------------------
+ * Developer: Muskan Sayyed
+ * Description: Drop-in browser fingerprint library.
+ *              Produces the same SHA-256 hash every time on
+ *              the same browser/machine - survives close, restart, and cookie deletion.
+ *              
+ *              INCLUDE: <script src="js/DeviceFingerprint.js"></script>
+ *              CALL:    DeviceFingerprint.init('device_fingerprint');
+ * 
+ * Created on: 15-05-2026
+ * 
+ * -------------------------------------------------------------------------------------
+ * CHANGELOG:
+ * ----------------------------------------------------------------------------
+ * Version | Date       | Author              | Description
+ * ----------------------------------------------------------------------------
+ * ----------------------------------------------------------------------------
  *
- * INCLUDE: <script src="js/DeviceFingerprint.js"></script>
- * CALL:    DeviceFingerprint.init('device_fingerprint');
+ * ----------------------------------------------------------------------------
  */
 const DeviceFingerprint = (() => {
 
