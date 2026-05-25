@@ -2,7 +2,16 @@
 /**
  * device_fingerprint.php
  * ════════════════════════════════════════════════════════════════
- * Single include file. Drop into your project root.
+ * Developer: Muskan Sayyed
+ * Description: It is a device verification system designed to manage and secure user devices for an account. 
+ *              It allows users to register up to 5 devices, and if the limit is reached, 
+ *              they must select an existing device to remove before adding a new one. 
+ *              The system uses OTP verification to ensure that only authorized users can add or replace devices. 
+ *              It also captures browser information and generates a unique fingerprint for each device, 
+ *              which is stored in the database and used for authentication.
+ *
+ *               
+ * Created on: 15-05-2026
  *
  *   require_once 'device_fingerprint.php';
  *
@@ -32,6 +41,13 @@
  *   DeviceFingerprint::parseAllEntries() handles both old and new
  *   format so existing registered devices are not broken.
  *
+ * CHANGELOG:
+ *----------------------------------------------------------------------------
+ * Version | Date       | Author              | Description
+ * ----------------------------------------------------------------------------
+ * ----------------------------------------------------------------------------
+ *
+ *-----------------------------------------------------------------------------
  * ════════════════════════════════════════════════════════════════
  */
 class DeviceFingerprint
