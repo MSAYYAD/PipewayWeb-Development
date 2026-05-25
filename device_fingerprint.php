@@ -75,7 +75,7 @@ class DeviceFingerprint
         return self::isValid($fp) ? $fp : '';
     }
 
-    /** Save fingerprint to session (login_1.php → verify_device.php) */
+    /** Save fingerprint to session (login_MS.php → verify_device.php) */
     public static function saveToSession(string $fp): void
     {
         if (self::isValid($fp)) $_SESSION['device_fingerprint'] = $fp;
@@ -89,7 +89,7 @@ class DeviceFingerprint
     }
 
     // ══════════════════════════════════════════════════════════════
-    //  DEVICE MATCHING  (call this in login_1.php foreach)
+    //  DEVICE MATCHING  (call this in login_MS.php foreach)
     // ══════════════════════════════════════════════════════════════
 
     /**
