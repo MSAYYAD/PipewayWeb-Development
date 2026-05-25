@@ -1,15 +1,3 @@
-<!--
-* CHANGELOG:
-*----------------------------------------------------------------------------
-* Version | Date       | Author              | Description
-* ----------------------------------------------------------------------------
-* ----------------------------------------------------------------------------
-* 1.1     | 2026-05-15 | MS15052026          | Added Device Verification logic            
-*         |            |                     | To detect known and new login                    
-*         |            |                     | devices also verify and manage 
-*         |            |                     | those devices through tbl_login   
-*-----------------------------------------------------------------------------
--->
 <!DOCTYPE html>
 <!---- for browser version check----------------------------->
 <script>
@@ -95,7 +83,18 @@ input:-internal-autofill-selected {background-color: #fff !important;}
 </div>
 
 <?php
-
+/** 
+* CHANGELOG:
+*----------------------------------------------------------------------------
+* Version | Date       | Author              | Description
+* ----------------------------------------------------------------------------
+* ----------------------------------------------------------------------------
+* 1.1     | 2026-05-15 | MS15052026          | Added Device Verification logic            
+*         |            |                     | To detect known and new login                    
+*         |            |                     | devices also verify and manage 
+*         |            |                     | those devices through tbl_login   
+*-----------------------------------------------------------------------------
+*/
 header("X-XSS-Protection: 1; mode=block");
 // ini_set('header always set x-frame-options',"DENY");
 error_reporting(1);
