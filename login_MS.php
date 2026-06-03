@@ -117,6 +117,7 @@ function getBrowserName($userAgent) {
     if(stripos($userAgent, 'MSIE') !== false || stripos($userAgent, 'Trident') !== false) return 'Internet Explorer';
     return 'Unknown Browser';
 }
+
 // MS15052026 - END GET BROWSER NAME
 
 for ($i = 1; $i <= 36; $i++) 
@@ -269,17 +270,7 @@ if (!empty($row['FPrint'])) {
 //  NOT VERIFIED - send to OTP page
 if (!$deviceVerified) {
  
-    //$otp = rand(100000, 999999);
-   // $_SESSION['otp']      = $otp;
-    //$_SESSION['otp_time'] = time();
- 
-    /* mysqli_query($conn, "UPDATE tbl_login
-        SET OTP      = '" . mysqli_real_escape_string($conn, $otp) . "',
-            OTPTime  = '" . date('Y-m-d H:i:s') . "',
-            OTPCount = '$deviceCount'
-        WHERE id = " . $id); */
- 
-    echo "<script>alert('Your OTP is: $otp');</script>"; // remove in production
+    //echo "<script>alert('Your OTP is: $otp');</script>"; // remove in production
  
     $_SESSION['temp_user_id']         = $id;
     $_SESSION['new_device_ip']        = $ipAddress;
