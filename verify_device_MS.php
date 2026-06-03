@@ -1,3 +1,4 @@
+<?php
 /** 
 * Developer: Muskan Sayyed
 * Description: It is a device verification system designed to manage and secure user devices for an account. 
@@ -18,13 +19,12 @@
 *
 *-----------------------------------------------------------------------------
 */
-<?php
 session_start();
 include_once "config.php";
 require_once 'device_fingerprint.php'; // include the fingerprint class
 
 if(!isset($_SESSION['temp_user_id'])){
-    header("Location: login_1_MS.php");
+    header("Location: login_MS.php");
     exit();
 }
 
@@ -32,18 +32,57 @@ $user_id = (int)$_SESSION['temp_user_id'];
 $newIP   = $_SESSION['new_device_ip'];
 $device  = $_SESSION['new_device_name'];
 
-// ── Retrieve fingerprint passed from login_1_MS.php ─────────────────
+// ── Retrieve fingerprint passed from login_MS.php ─────────────────
 $fp = DeviceFingerprint::fromSession();   
 
-// Generate OTP only on first page load — NOT on form submit.
-// If generated on every load, the session OTP gets replaced before
-// the verify_otp check runs, causing "Invalid or Expired OTP" every time.
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    $_SESSION['otp']      = rand(100000, 999999);
-    $_SESSION['otp_time'] = time();
-}
+// Generate OTP only on first page load OR when "Request new code" is submitted.
+// NOT on every POST — otherwise the OTP is overwritten before the comparison runs.
+$otpSendError = '';
+if ($_SERVER['REQUEST_METHOD'] !== 'POST' || isset($_POST['resend_otp'])) {
 
-$msg = "";
+    $otp = rand(100000, 999999);
+    $_SESSION['otp']      = $otp;
+    $_SESSION['otp_time'] = time();
+
+    // ── Fetch user email from DB to send OTP ──────────────────────────
+    $emailQuery  = mysqli_query($conn, "SELECT email, fullName FROM tbl_login WHERE id = $user_id");
+    $emailRow    = mysqli_fetch_assoc($emailQuery);
+    $toEmail     = $emailRow['email']    ?? '';
+    $toName      = $emailRow['fullName'] ?? 'User';
+
+    if (!empty($toEmail)) {
+        $subject = 'Your Device Verification Code';
+
+        // ── Using existing PHPMailer setup to send OTP email 
+        include_once 'PHPMailer/class.phpmailer.php';
+        include_once 'PHPMailer/class.smtp.php';
+
+        $mail = new PHPMailer;
+        $mail->isSMTP();
+        $mail->Host      = '172.16.13.209';   // internal SMTP server
+        $mail->SMTPAuth  = false;              
+        $mail->Port      = 25;
+        $mail->From      = 'pwadmin@aacanet.org';
+        $mail->FromName  = 'Pipeway 2.0';
+
+        $mail->addAddress($toEmail, $toName);
+        $mail->Subject = $subject;
+        $mail->isHTML(false);                  // plain text
+        $mail->Body =
+            "Dear " . $toName . ",\r\n\r\n"
+          . "Your one-time password (OTP) for device verification is:\r\n\r\n"
+          . "    " . $otp . "\r\n\r\n"
+          . "This code is valid for 15 minutes.\r\n\r\n"
+          . "If you did not request this, please contact support immediately.\r\n\r\n"
+          . "Regards,\r\nPipeway 2.0";
+
+        if (!$mail->send()) {
+            $otpSendError = 'Could not send OTP email. Please try again or contact support.';
+        }
+    } else {
+        $otpSendError = 'No email address found for your account. Please contact support.';
+    }
+}
 
 // ================= GET USER DEVICES =================
 $query = "SELECT FPrint FROM tbl_login WHERE id=$user_id";
@@ -57,12 +96,6 @@ $rawIPfield  = $row['FPrint'] ?? '';
 $deviceEntries = DeviceFingerprint::parseAllEntries($rawIPfield);  
 $deviceCount   = count($deviceEntries);
  
-// Keep raw strings in same order for display & removal
-//if (strpos($rawIPfield, ';;') !== false) {
-//    $rawList = array_values(array_filter(array_map('trim', explode(';;', $rawIPfield))));
-//} else {
-//    $rawList = array_values(array_filter(array_map('trim', explode(',', $rawIPfield))));
-//}
 $rawList = array_values(array_filter(array_map('trim', explode(';;', $rawIPfield))));
 
 // ================= VERIFY OTP =================
@@ -79,12 +112,7 @@ if(isset($_POST['verify_otp'])){
     //Echo "Current count: " . $currentCount; // DEBUG
     //exit();
  
-    //if (strpos($latestRaw, ';;') !== false) {
-    //    $latestRawList = array_values(array_filter(array_map('trim', explode(';;', $latestRaw))));
-    //} else {
-    //    $latestRawList = array_values(array_filter(array_map('trim', explode(',', $latestRaw))));
-    //}
-    // Always split by ;; only — same reason as rawList above
+    // Always split by ;; only to get the latest list of entries, then parse each entry for details.
     $latestRawList = array_values(array_filter(array_map('trim', explode(';;', $latestRaw))));
     
     // Block if limit reached but no device selected yet
@@ -96,14 +124,15 @@ if(isset($_POST['verify_otp'])){
     elseif (
         isset($_SESSION['otp']) &&
         $_POST['otp'] == $_SESSION['otp'] &&
-        (time() - $_SESSION['otp_time']) < 300
+        //(time() - $_SESSION['otp_time']) < 300
+        (time() - $_SESSION['otp_time']) < 900
     ) {
         $browser = mysqli_real_escape_string($conn, $_SERVER['HTTP_USER_AGENT']);
  
         // Get fingerprint — prefer POST (freshly computed), fall back to session
         $currentFP = DeviceFingerprint::fromPost();
         if (!DeviceFingerprint::isValid($currentFP)) {
-            $currentFP = $fp; // from session (set in login_1_MS.php)
+            $currentFP = $fp; // from session (set in login_MS.php)
         }
  
         // ── CASE 1: ADD NEW DEVICE ────────────────────────────────
@@ -165,7 +194,6 @@ if(isset($_POST['verify_otp'])){
         exit();
  
     } else {
-        //$msg = "Invalid or Expired OTP!"; // Not getting cleared on page reload, so moved to session to show only once
         $_SESSION['vd_error'] = "Invalid or Expired OTP!";
         header("Location: verify_device_MS.php");
         exit();
@@ -393,6 +421,29 @@ body {
 }
 .vd-device-item-icon { color: var(--pw-navy); font-size: 15px; flex-shrink: 0; }
 .vd-device-item-name { font-size: 13px; font-weight: 600; color: var(--pw-text); }
+
+/* ── Email info message ──────────────────────────────────────── */
+.vd-info-msg {
+    display: flex; align-items: flex-start; gap: 10px;
+    background: #eaf4fb; border-left: 4px solid #2980b9;
+    border-radius: 3px; padding: 11px 14px; margin-bottom: 14px;
+    font-size: 13px; color: #1a5276; line-height: 1.5;
+}
+.vd-info-msg i { flex-shrink: 0; margin-top: 2px; color: #2980b9; }
+
+/* ── Resend / countdown ──────────────────────────────────────── */
+.vd-resend-wrap { text-align: center; margin-top: 12px; }
+.vd-countdown { font-size: 12px; color: var(--pw-muted); }
+.vd-countdown b { color: var(--pw-navy); }
+.vd-btn-resend {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 7px 18px; font-size: 13px; font-family: var(--pw-font);
+    font-weight: 600; color: var(--pw-navy);
+    background: var(--pw-blue-light); border: 1px solid var(--pw-navy);
+    border-radius: 4px; cursor: pointer; transition: background .15s;
+    margin-top: 6px;
+}
+.vd-btn-resend:hover { background: #d0e4fa; }
  
 /* ── OTP Testing Hint ────────────────────────────────────────── */
 .vd-otp-hint {
@@ -465,7 +516,7 @@ else                                      $faIcon = 'fa-chrome';
  
     <!-- Browser Info (IP removed as requested) -->
     <div class="vd-meta">
-        <div class="vd-meta-icon"><i class="fa <?php echo $faIcon; ?>"></i></div>
+        <!--<div class="vd-meta-icon"><i class="fa <?php/* echo $faIcon; */?>"></i></div>-->
         <div>
             <div class="vd-meta-label">Detected Browser</div>
             <div class="vd-meta-value"><?php echo htmlspecialchars($device); ?></div>
@@ -487,6 +538,36 @@ else                                      $faIcon = 'fa-chrome';
         <div class="vd-section-title">
             <i class="fa fa-plus-circle"></i>&nbsp; Register New Device
         </div>
+
+        <?php if (!empty($otpSendError)): ?>
+        <div class="vd-error">
+            <i class="fa fa-exclamation-circle"></i>
+            <?php echo htmlspecialchars($otpSendError); ?>
+        </div>
+        <?php else: ?>
+        <div class="vd-info-msg">
+            <i class="fa fa-envelope"></i>
+            A one time password has been sent to your email address.
+            If you do not receive it, please check your junk or spam filters.
+        </div>
+
+        <!-- Countdown + Request new code — shown for OTP states (not Step 1 device list) -->
+        <div class="vd-resend-wrap">
+            <div class="vd-countdown" id="countdown-msg">
+                Code expires in <b id="countdown-timer">15:00</b>
+            </div>
+            <form method="post" id="resend-form" style="display:none; margin-top:4px;">
+                <input type="hidden" name="device_fingerprint" value="<?php echo $fpForForm; ?>">
+                <button type="submit" name="resend_otp" class="vd-btn-resend">
+                    <i class="fa fa-rotate-right"></i> Request new code
+                </button>
+            </form>
+        </div>
+
+        <!-- OTP display removed — OTP is now sent via email only -->
+
+        <?php endif; ?>
+
         <form method="post">
             <input type="hidden" id="device_fingerprint" name="device_fingerprint" value="<?php echo $fpForForm; ?>">
             <div class="vd-form-group">
@@ -539,6 +620,11 @@ else                                      $faIcon = 'fa-chrome';
             <i class="fa fa-info-circle"></i>
             Enter OTP to confirm replacement of the selected device.
         </div>
+        <div class="vd-info-msg">
+            <i class="fa fa-envelope"></i>
+            A one time password has been sent to your email address.
+            If you do not receive it, please check your junk or spam filters.
+        </div>
         <div class="vd-section-title">
             <i class="fa fa-key"></i>&nbsp; Confirm with OTP
         </div>
@@ -554,6 +640,22 @@ else                                      $faIcon = 'fa-chrome';
                 <input type="text" name="otp" class="vd-input otp-input"
                        placeholder="••••••" maxlength="6" autocomplete="off" required>
             </div>
+
+            <!-- Countdown + Request new code — shown for OTP states (not Step 1 device list) -->
+        
+            <div class="vd-resend-wrap">
+            <div class="vd-countdown" id="countdown-msg">
+                Code expires in <b id="countdown-timer">15:00</b>
+            </div>
+            <form method="post" id="resend-form" style="display:none; margin-top:4px;">
+                <input type="hidden" name="device_fingerprint" value="<?php echo $fpForForm; ?>">
+                <!--<button type="submit" name="resend_otp" class="vd-btn-resend">
+                    <i class="fa fa-rotate-right"></i> Request new code
+                </button>-->
+            </form>
+            </div>
+        <!-- OTP display removed — OTP is now sent via email only -->
+
             <button type="submit" name="verify_otp" class="vd-btn vd-btn-success">
                 <i class="fa fa-refresh"></i> Verify &amp; Replace
             </button>
@@ -570,13 +672,13 @@ else                                      $faIcon = 'fa-chrome';
     </div><!-- /vd-body -->
  
     <!-- OTP Testing hint — REMOVE IN PRODUCTION -->
-    <?php if (isset($_SESSION['otp'])): ?>
-    <div class="vd-otp-hint">
-        OTP <br> <!--(testing only — remove in production) -->
-        <span><?php echo $_SESSION['otp']; ?></span>
+    <?php /*if (isset($_SESSION['otp'])): */?>
+    <!-- <div class="vd-otp-hint">
+        OTP <br> (testing only — remove in production) 
+        <span> if (isset($_SESSION['otp'])): </span>
     </div>
-    <br>
-    <?php endif; ?>
+    <br> -->
+    <?php /*endif;*/ ?>
  
     <div class="vd-footer">
         <i class="fa fa-shield"></i>&nbsp; This device will be securely registered to your account.
@@ -587,6 +689,36 @@ else                                      $faIcon = 'fa-chrome';
 <script src="js/DeviceFingerprint.js"></script>
 <script>
   DeviceFingerprint.init('device_fingerprint');
+  // ── OTP countdown timer ──────────────────────────────────────────
+  // Uses server-issued timestamp so refreshing never resets the clock.
+  // When it hits 0, hides the countdown and shows "Request new code".
+  (function () {
+    var otpIssuedAt   = <?php echo (int)($_SESSION['otp_time'] ?? time()); ?>;
+    var expirySeconds = 900; // 15 minutes — must match PHP (time() - otp_time) < 900
+    var timerEl  = document.getElementById('countdown-timer');
+    var msgEl    = document.getElementById('countdown-msg');
+    var formEl   = document.getElementById('resend-form');
+
+    if (!timerEl) return;
+
+    function tick() {
+      var elapsed   = Math.floor(Date.now() / 1000) - otpIssuedAt;
+      var remaining = expirySeconds - elapsed;
+
+      if (remaining <= 0) {
+        msgEl.style.display  = 'none';
+        formEl.style.display = 'block';
+        return;
+      }
+
+      var mins = Math.floor(remaining / 60);
+      var secs = remaining % 60;
+      timerEl.textContent = mins + ':' + (secs < 10 ? '0' : '') + secs;
+      setTimeout(tick, 1000);
+    }
+
+    tick();
+  })();
 </script>
 </body>
 </html>
