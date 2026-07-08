@@ -77,7 +77,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST' || isset($_POST['resend_otp'])) {
           . "Regards,\r\nPipeway 2.0";
 
         if (!$mail->send()) {
-            $otpSendError = 'Could not send OTP email. Please try again or contact support.';
+        $otpSendError = 'Could not send OTP email. Please try again or contact support.';
         }
     } else {
         $otpSendError = 'No email address found for your account. Please contact support.';
@@ -139,7 +139,12 @@ if(isset($_POST['verify_otp'])){
         if ($currentCount < 5) {
  
             $deviceLabel = trim($_POST['device_label'] ?? '');
-            if ($deviceLabel === '') $deviceLabel = 'New Device';
+            // if ($deviceLabel === '') $deviceLabel = 'New Device';
+            /* If user left the Device Name field blank, assign a sequential
+               default name based on how many devices are already registered.*/
+            if ($deviceLabel === '') {
+                $deviceLabel = 'Device ' . ($currentCount + 1);
+            }
  
             // buildEntry() creates "IP|Label|UA|Token|FP" — clean, consistent
             $newRawEntry = DeviceFingerprint::buildEntry($newIP, $deviceLabel, $browser, $currentFP);
@@ -154,7 +159,13 @@ if(isset($_POST['verify_otp'])){
                 array_splice($latestRawList, $removeIndex, 1);
             }
             $deviceLabel = trim($_POST['device_label'] ?? '');
-            if ($deviceLabel === '') $deviceLabel = 'New Device';
+            // if ($deviceLabel === '') $deviceLabel = 'New Device';
+            /* If user left the Device Name field blank during replacement,
+               reuse the same slot number that was removed e.g. slot 3 removed → new device gets "Device 3" */
+            if ($deviceLabel === '') {
+                $deviceLabel = 'Device ' . ($removeIndex + 1);
+            }
+
             $newRawEntry = DeviceFingerprint::buildEntry($newIP, $deviceLabel, $browser, $currentFP);
             $latestRawList[] = $newRawEntry;
         }
@@ -194,7 +205,7 @@ if(isset($_POST['verify_otp'])){
         exit();
  
     } else {
-        $_SESSION['vd_error'] = "Invalid or Expired OTP!";
+        $_SESSION['vd_error'] = "Entered Invalid OTP!";
         header("Location: verify_device_MS.php");
         exit();
     }
@@ -218,7 +229,7 @@ if (isset($_POST['select_device'])) {
 // ═══════════════════════════════════════════
 if (isset($_POST['reject'])) {
     session_destroy();
-    header("Location: login_1_MS.php");
+    header("Location: login_MS.php");
     exit();
 }
  
@@ -284,10 +295,10 @@ body {
 /* ── Header ─────────────────────────────────────────────────── */
 .vd-header {
     background: var(--pw-navy);
-    padding: 18px 24px;
+    padding: 12px 20px;
     display: flex;
     align-items: center;
-    gap: 13px;
+    gap: 12px;
 }
 .vd-header-icon {
     width: 40px; height: 40px;
@@ -367,35 +378,97 @@ body {
 }
 .vd-input::placeholder { color: #aaa; }
 .vd-input.otp-input {
-    text-align: center; font-size: 26px; font-weight: 700;
-    letter-spacing: 10px; padding: 10px 12px; color: var(--pw-navy);
+    text-align: center; font-size: 20px; font-weight: 700;
+    letter-spacing: 10px; padding: 8px 10px; color: var(--pw-navy);
 }
  
 /* ── Buttons ─────────────────────────────────────────────────── */
 .vd-btn {
     display: inline-flex; align-items: center;
-    justify-content: center; gap: 7px;
+    justify-content: center; gap: 6px;
     width: 100%; padding: 9px 20px;
     font-size: 14px; font-family: var(--pw-font); font-weight: 600;
     border: none; border-radius: 4px; cursor: pointer;
-    box-shadow: 2px 2px 3px rgba(0,46,91,0.22);
-    transition: background 0.15s, transform 0.1s;
+    box-shadow: 0 1px 3px rgba(0,46,91,0.15);
+    transition: background 0.15s, box-shadow 0.15s, transform 0.1s;
     margin-top: 4px;
 }
 .vd-btn:active { transform: translateY(1px); }
-.vd-btn-success { background: var(--pw-green);   color: #fff; }
-.vd-btn-success:hover { background: var(--pw-green-dark); }
-.vd-btn-primary { background: var(--pw-navy);    color: #fff; }
-.vd-btn-primary:hover { background: #003d7a; }
-.vd-btn-danger  { background: var(--pw-crimson); color: #fff; margin-top: 10px; }
-.vd-btn-danger:hover  { background: var(--pw-crimson-dark); }
+
+/* Full-width green — Save & Login (normal flow only, no sibling) */
+.vd-btn-success {
+    background: #2e9e68;  /* lighter professional green — less saturated than #00a65a */
+    color: #fff;
+    border: 1.5px solid #1ea456;             /* muted green border */
+    border-radius: 4px; cursor: pointer;
+}
+.vd-btn-success:hover { background: #dce8f7; }
+
+.vd-btn-primary { background: #2c5282; color: #fff; } /* lighter professional navy */
+.vd-btn-primary:hover { background: #244070; }
+
+.vd-btn-danger  { background: #c0392b; color: #fff; margin-top: 10px; } /* lighter professional red */
+.vd-btn-danger:hover  { background: #a93226; }
+
+/* ── Side-by-side button row ─────────────────────────────────────
+   Used to place "Verify & Replace" and "Request new code" on the
+   same line. Each button takes exactly 50% of the row width.
+   gap: 8px gives a clean breathing space between them.            */
+.vd-btn-row {
+    display: flex;
+    gap: 8px;
+    margin-top: 6px;
+    align-items: stretch;
+}
+
+/* When inside a .vd-btn-row, buttons share the row equally.
+   Override width:100% set on .vd-btn so they don't overflow.     */
+.vd-btn-row .vd-btn {
+    flex: 1;          /* each button takes equal share of available width */
+    width: auto;      /* override the default width:100% */
+    margin-top: 0;    /* row already has margin-top:6px */
+    font-size: 13px;  /* slightly smaller so both labels fit comfortably */
+    padding: 9px 10px;
+}
+
+/* "Request new code" inside the row — outlined style to visually
+   distinguish it from the primary action (Verify & Replace).
+   Lighter, professional — feels secondary without being disabled. */
+.vd-btn-row .vd-btn-resend-inline {
+    flex: 1;
+    width: auto;
+    margin-top: 0;
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    padding: 9px 10px; font-size: 13px;
+    font-family: var(--pw-font); font-weight: 600;
+    color: #fff;                           /* navy text */
+    background: #2c5282;                      /* very light blue-grey background */
+    border: 1.5px solid #a0b4d0;             /* muted navy border */
+    border-radius: 4px; cursor: pointer;
+    box-shadow: 0 1px 2px rgba(0,46,91,0.08);
+    transition: background 0.15s, border-color 0.15s, transform 0.1s;
+}
+.vd-btn-row .vd-btn-resend-inline:hover {
+    background: #dce8f7;
+    border-color: #2c5282;
+}
+.vd-btn-row .vd-btn-resend-inline:active { transform: translateY(1px); }
+
+/* ── Countdown text below the button row ─────────────────────── */
+.vd-countdown {
+    text-align: center;
+    font-size: 12px;
+    color: var(--pw-muted);
+    margin-top: 7px;
+}
+.vd-countdown b { color: var(--pw-navy); font-weight: 700; }
  
 /* ── Alert banner ────────────────────────────────────────────── */
 .vd-alert {
     display: flex; align-items: flex-start; gap: 10px;
     background: #fdf2f4; border-left: 4px solid var(--pw-crimson);
-    border-radius: 3px; padding: 11px 14px; margin-bottom: 15px;
-    font-size: 13px; color: var(--pw-crimson-dark); font-weight: 600;
+    border-radius: 3px; padding: 9px 12px; margin-bottom: 15px;
+    font-size: 12px; color: var(--pw-crimson-dark); font-weight: 600;
 }
 .vd-alert i { flex-shrink: 0; margin-top: 1px; }
  
@@ -403,8 +476,21 @@ body {
 .vd-error {
     display: flex; align-items: center; gap: 8px;
     background: #fdf2f4; border: 1px solid #f5c6cb;
-    border-radius: 4px; padding: 9px 12px;
-    font-size: 13px; color: #721c24; margin-bottom: 14px;
+    border-radius: 4px; padding: 8px 11px;
+    font-size: 12px; color: #721c24; margin-bottom: 12px;
+}
+
+/* ── Disabled / greyed-out submit button ─────────────────────────
+   Applied by JS when OTP expires. Overrides green/navy with grey,
+   prevents any click via pointer-events:none so user cannot submit
+   an expired OTP even by pressing Enter or clicking rapidly.      */
+.vd-btn-disabled {
+    background: #adb5bd !important;
+    color: #fff !important;
+    cursor: not-allowed !important;
+    box-shadow: none !important;
+    opacity: 0.75;
+    pointer-events: none;
 }
  
 /* ── Device Radio List ───────────────────────────────────────── */
@@ -461,7 +547,7 @@ body {
  
 /* ── Footer ──────────────────────────────────────────────────── */
 .vd-footer {
-    text-align: center; padding: 8px 24px 18px;
+    text-align: center; padding: 6px 18px 10px;
     font-size: 11px; color: var(--pw-muted);
 }
 </style>
@@ -552,7 +638,7 @@ else                                      $faIcon = 'fa-chrome';
         </div>
 
         <!-- Countdown + Request new code — shown for OTP states (not Step 1 device list) -->
-        <div class="vd-resend-wrap">
+        <!-- <div class="vd-resend-wrap">
             <div class="vd-countdown" id="countdown-msg">
                 Code expires in <b id="countdown-timer">15:00</b>
             </div>
@@ -562,7 +648,7 @@ else                                      $faIcon = 'fa-chrome';
                     <i class="fa fa-rotate-right"></i> Request new code
                 </button>
             </form>
-        </div>
+        </div>-->
 
         <!-- OTP display removed — OTP is now sent via email only -->
 
@@ -573,17 +659,72 @@ else                                      $faIcon = 'fa-chrome';
             <div class="vd-form-group">
                 <label><i class="fa fa-tag"></i>&nbsp; Device Name</label>
                 <input type="text" name="device_label" class="vd-input"
-                       placeholder="e.g. My Work Laptop" required>
+                       placeholder="e.g. My Work Laptop">
             </div>
             <div class="vd-form-group">
                 <label><i class="fa fa-key"></i>&nbsp; One-Time Password (OTP)</label>
                 <input type="text" name="otp" class="vd-input otp-input"
                        placeholder="••••••" maxlength="6" autocomplete="off" required>
             </div>
-            <button type="submit" name="verify_otp" class="vd-btn vd-btn-success">
+           <!-- <button type="submit" name="verify_otp" class="vd-btn vd-btn-success">
                 <i class="fa fa-check-circle"></i> Save &amp; Login
-            </button>
+            </button>-->
         </form>
+
+        <!-- ── Countdown + Request new code ──────────────────────────
+             The countdown shows remaining OTP time.
+             "Request new code" is always visible (static) — user can
+             request a new code at any time, not only after expiry.
+             When the OTP expires, JS additionally:
+               - greys out the submit button
+               - replaces the timer with an expiry alert
+               - sets $_SESSION['vd_error'] via a hidden POST redirect  -->
+
+               <div class="vd-btn-row">
+                <button type="submit" name="verify_otp" class="vd-btn vd-btn-success">
+                    <i class="fa fa-check-circle"></i> Save &amp; Login
+                </button>
+                <button type="submit" name="resend_otp"
+                        form="resend-form-1"
+                        class="vd-btn-resend-inline">
+                    <i class="fa fa-rotate-right"></i> Request new code
+                </button>
+            </div><!-- /vd-btn-row -->
+            <!-- Hidden resend form — submitted by the button above via form= attribute -->
+            <form method="post" id="resend-form-1" style="display:none;">
+                <input type="hidden" name="device_fingerprint" value="<?php echo $fpForForm; ?>">
+            </form>
+
+            <!-- Countdown sits below both buttons, centred -->
+            <div class="vd-countdown" id="countdown-msg" style="margin-top:8px;">
+                Code expires in <b id="countdown-timer">15:00</b>
+            </div>
+            
+            
+        <!-- <div class="vd-resend-wrap"> -->
+            <!-- Countdown text — JS updates this every second -->
+            <!-- <div class="vd-countdown" id="countdown-msg">
+                Code expires in <b id="countdown-timer">15:00</b>
+            </div> -->
+
+            <!-- Expiry alert — hidden initially, shown by JS when timer hits 0:00.
+                 Uses the same vd-error style as the server-side flash error so it
+                 looks identical to "Invalid or Expired OTP!" from $_SESSION['vd_error'] -->
+            <div id="otp-expired-alert" class="vd-error" style="display:none; margin-top:7px;">
+                <i class="fa fa-exclamation-circle"></i>
+                Expired OTP! Please request a new code.
+            </div>
+
+            <!-- Static "Request new code" button — always visible so users
+                 do not have to wait for the countdown to reach zero.
+                 Submits resend_otp POST which regenerates OTP and sends new email. -->
+            <!-- <form method="post" id="resend-form" style="margin-top:8px;">
+                <input type="hidden" name="device_fingerprint" value="<?php echo $fpForForm; ?>">
+                <button type="submit" name="resend_otp" class="vd-btn-resend"> -->
+                    <!--<i class="fa fa-rotate-right"></i> Request new code -->
+                <!-- </button>
+            </form>
+        </div> -->
  
         <?php elseif (!$showStep2): ?>
         <!-- ══ LIMIT REACHED — Step 1: Pick device to remove ════ -->
@@ -620,11 +761,18 @@ else                                      $faIcon = 'fa-chrome';
             <i class="fa fa-info-circle"></i>
             Enter OTP to confirm replacement of the selected device.
         </div>
+        <?php if (!empty($otpSendError)): ?>
+        <div class="vd-error">
+            <i class="fa fa-exclamation-circle"></i>
+            <?php echo htmlspecialchars($otpSendError); ?>
+        </div>
+        <?php else: ?>
         <div class="vd-info-msg">
             <i class="fa fa-envelope"></i>
             A one time password has been sent to your email address.
             If you do not receive it, please check your junk or spam filters.
         </div>
+        <?php endif; ?>
         <div class="vd-section-title">
             <i class="fa fa-key"></i>&nbsp; Confirm with OTP
         </div>
@@ -633,7 +781,7 @@ else                                      $faIcon = 'fa-chrome';
             <div class="vd-form-group">
                 <label><i class="fa fa-tag"></i>&nbsp; New Device Name</label>
                 <input type="text" name="device_label" class="vd-input"
-                       placeholder="e.g. My Work Laptop" required>
+                       placeholder="e.g. My Work Laptop">
             </div>
             <div class="vd-form-group">
                 <label><i class="fa fa-key"></i>&nbsp; One-Time Password (OTP)</label>
@@ -641,26 +789,96 @@ else                                      $faIcon = 'fa-chrome';
                        placeholder="••••••" maxlength="6" autocomplete="off" required>
             </div>
 
+
+            <!-- ── Side-by-side button row (replace flow) ────────────────
+                 "Verify & Replace" primary action + "Request new code"
+                 secondary outlined — equal width, same line.
+                 form="resend-form-2" targets the hidden form below.     -->
+            <div class="vd-btn-row">
+                <button type="submit" name="verify_otp" class="vd-btn vd-btn-success">
+                    <i class="fa fa-refresh"></i> Verify &amp; Replace
+                </button>
+                <button type="submit" name="resend_otp"
+                        form="resend-form-2"
+                        class="vd-btn-resend-inline">
+                    <i class="fa fa-rotate-right"></i> Request new code
+                </button>
+            </div><!-- /vd-btn-row -->
+
+            <!-- Hidden resend form — submitted by the button above via form= attribute -->
+            <form method="post" id="resend-form-2" style="display:none;">
+                <input type="hidden" name="device_fingerprint" value="<?php echo $fpForForm; ?>">
+            </form>
+
+            <!-- Countdown below both buttons, centred -->
+            <div class="vd-countdown" id="countdown-msg" style="margin-top:8px;">
+                Code expires in <b id="countdown-timer">15:00</b>
+            </div>
+
+            <!-- Expiry alert — hidden initially, shown by JS when timer hits 0:00.
+                 Uses the same vd-error styling as $_SESSION['vd_error'] flash errors
+                 so the expiry message looks identical to server-side OTP errors. -->
+            <div id="otp-expired-alert" class="vd-error" style="display:none; margin-top:7px;">
+                <i class="fa fa-exclamation-circle"></i>
+                Expired OTP! Please request a new code.
+            </div>
+            </form>
+        <?php endif; ?>
+
+        <!-- Hidden resend form — OUTSIDE all other forms -->
+        <form method="post" id="resend-form-2" style="display:none;">
+            <input type="hidden" name="resend_otp" value="1">
+            <input type="hidden" name="device_fingerprint" value="<?php echo $fpForForm; ?>">
+        </form>
+
+
             <!-- Countdown + Request new code — shown for OTP states (not Step 1 device list) -->
         
-            <div class="vd-resend-wrap">
+            <!-- <div class="vd-resend-wrap">
             <div class="vd-countdown" id="countdown-msg">
                 Code expires in <b id="countdown-timer">15:00</b>
             </div>
             <form method="post" id="resend-form" style="display:none; margin-top:4px;">
-                <input type="hidden" name="device_fingerprint" value="<?php echo $fpForForm; ?>">
+                <input type="hidden" name="device_fingerprint" value="<?php echo $fpForForm; ?>"> -->
                 <!--<button type="submit" name="resend_otp" class="vd-btn-resend">
                     <i class="fa fa-rotate-right"></i> Request new code
                 </button>-->
-            </form>
-            </div>
+            <!-- </form>
+            </div>-->
         <!-- OTP display removed — OTP is now sent via email only -->
 
-            <button type="submit" name="verify_otp" class="vd-btn vd-btn-success">
+            <!-- <button type="submit" name="verify_otp" class="vd-btn vd-btn-success">
                 <i class="fa fa-refresh"></i> Verify &amp; Replace
             </button>
         </form>
-        <?php endif; ?>
+        <?php //endif; ?> -->
+
+        <!-- ── Countdown + Request new code (shared by both OTP flows) ──
+             Shown for normal flow and replace-device flow.
+             Not shown during Step 1 device selection (no OTP needed there). -->
+        <!-- <div class="vd-resend-wrap"> -->
+            <!-- Countdown text — JS updates this every second -->
+            <!-- <div class="vd-countdown" id="countdown-msg">
+                Code expires in <b id="countdown-timer">15:00</b>
+            </div> -->
+
+            <!-- Expiry alert — hidden initially, shown by JS when timer hits 0:00.
+                 Uses the same vd-error styling as $_SESSION['vd_error'] flash errors
+                 so the expiry message looks identical to server-side OTP errors. -->
+            <!-- <div id="otp-expired-alert" class="vd-error" style="display:none; margin-top:8px;">
+                <i class="fa fa-exclamation-circle"></i>
+                Expired OTP! Please request a new code below.
+            </div> -->
+
+            <!-- Static "Request new code" button — always visible.
+                 User can request a fresh code at any time without waiting for expiry. -->
+            <!-- <form method="post" id="resend-form" style="margin-top:8px;">
+                <input type="hidden" name="device_fingerprint" value="<?php echo $fpForForm; ?>">
+                <button type="submit" name="resend_otp" class="vd-btn-resend"> -->
+                    <!--<i class="fa fa-rotate-right"></i> Request new code-->
+                <!-- </button>
+            </form>
+        </div> -->
  
         <!-- Cancel always visible -->
         <form method="post">
@@ -693,31 +911,45 @@ else                                      $faIcon = 'fa-chrome';
   // Uses server-issued timestamp so refreshing never resets the clock.
   // When it hits 0, hides the countdown and shows "Request new code".
   (function () {
+
     var otpIssuedAt   = <?php echo (int)($_SESSION['otp_time'] ?? time()); ?>;
-    var expirySeconds = 900; // 15 minutes — must match PHP (time() - otp_time) < 900
-    var timerEl  = document.getElementById('countdown-timer');
-    var msgEl    = document.getElementById('countdown-msg');
-    var formEl   = document.getElementById('resend-form');
+    var expirySeconds = 900;
+
+    var timerEl      = document.getElementById('countdown-timer');
+    var countdownMsg = document.getElementById('countdown-msg');
+    var expiredAlert = document.getElementById('otp-expired-alert');
 
     if (!timerEl) return;
+
+    function disableSubmitButtons() {
+      // Select ALL buttons with name="verify_otp" — covers both flows
+      var btns = document.querySelectorAll('button[name="verify_otp"]');
+      btns.forEach(function (btn) {
+        btn.disabled = true;
+        btn.classList.add('vd-btn-disabled');
+      });
+    }
 
     function tick() {
       var elapsed   = Math.floor(Date.now() / 1000) - otpIssuedAt;
       var remaining = expirySeconds - elapsed;
 
       if (remaining <= 0) {
-        msgEl.style.display  = 'none';
-        formEl.style.display = 'block';
+        disableSubmitButtons();
+        if (countdownMsg) countdownMsg.style.display = 'none';
+        if (expiredAlert) expiredAlert.style.display = 'flex';
         return;
       }
 
       var mins = Math.floor(remaining / 60);
       var secs = remaining % 60;
       timerEl.textContent = mins + ':' + (secs < 10 ? '0' : '') + secs;
+
       setTimeout(tick, 1000);
     }
 
     tick();
+
   })();
 </script>
 </body>
